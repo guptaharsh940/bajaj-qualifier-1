@@ -1,20 +1,21 @@
 'use client';
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Select, { MultiValue } from 'react-select';
 import makeAnimated from 'react-select/animated';
 
 type OutputType = {
-  numbers: string | undefined;
-  alphabets: string | undefined;
-  highest_alphabet: string | undefined;
-  error: string | undefined;
-}
+  numbers: string[];
+  alphabets: string[];
+  highest_alphabet: string[];
+  error?: string;
+};
 
 export default function Home() {
   const [input, setInput] = useState<string>("");
-  const [output, setOutput] = useState<OutputType>();
+  const [output, setOutput] = useState<OutputType>({ numbers: [], alphabets: [], highest_alphabet: [] });
   const [selectedOptions, setSelectedOptions] = useState<MultiValue<{ value: string, label: string }>>([]);
+  const [isSubmit, setSubmit] = useState<boolean>(false);
 
   const animatedComponents = makeAnimated();
   const options = [
@@ -36,6 +37,7 @@ export default function Home() {
   // Function to handle button click
   const handleSubmit = async () => {
     if (validateJson(input)) {
+      setSubmit(true);
       try {
         const response = await fetch("/api/bfhl", {
           method: "POST",
@@ -45,34 +47,27 @@ export default function Home() {
           body: JSON.stringify(JSON.parse(input)),
         });
 
-        const data = await response.json();
-
         if (response.ok) {
-          // Filter data based on selected options
-          const selectedValues = selectedOptions.map(option => option.value);
-          const filteredData: OutputType = {
-            numbers: selectedValues.includes('num') ? data.numbers : undefined,
-            alphabets: selectedValues.includes('alpha') ? data.alphabets : undefined,
-            highest_alphabet: selectedValues.includes('highalpha') ? data.highest_alphabet : undefined,
+          const data = await response.json();
+          setOutput({
+            numbers: data.numbers || [],
+            alphabets: data.alphabets || [],
+            highest_alphabet: data.highest_alphabet || [],
             error: undefined
-          };
-
-
-
-          setOutput(filteredData);
+          });
         } else {
           setOutput({
-            numbers: undefined,
-            alphabets: undefined,
-            highest_alphabet: undefined,
-            error: "Error fetching data."
+            numbers: [],
+            alphabets: [],
+            highest_alphabet: [],
+            error: "Error fetching data"
           });
         }
       } catch (error) {
         setOutput({
-          numbers: undefined,
-          alphabets: undefined,
-          highest_alphabet: undefined,
+          numbers: [],
+          alphabets: [],
+          highest_alphabet: [],
           error: "An error occurred."
         });
       }
@@ -80,6 +75,12 @@ export default function Home() {
       alert("Invalid JSON");
     }
   };
+
+  useEffect(() => {
+    if (isSubmit) {
+      // Logic to filter data based on selectedOptions
+    }
+  }, [selectedOptions, isSubmit]);
 
   return (
     <div>
@@ -102,40 +103,46 @@ export default function Home() {
         >
           Submit
         </button>
-        <div className="relative mt-5 mb-5">
-          <label className="absolute top-[-10px] left-2 bg-white px-1 text-gray-700 text-sm">
-            Multi-select
-          </label>
-          <div className="border border-gray-300 rounded-lg p-2">
-            <Select
-              closeMenuOnSelect={false}
-              components={animatedComponents}
-              isMulti
-              options={options}
-              onChange={(newValue) => setSelectedOptions(newValue as MultiValue<{ value: string, label: string }>)}
-            />
-          </div>
-        </div>
 
-        <div>
-          <h1 className="font-bold">Filtered Response</h1>
-          
-          <p>{output?.numbers && (
-            <>
-              Numbers: {output.numbers}
-            </>
-          )}</p>
-          <p>{output?.alphabets && (
-            <>
-              Alphabets: {output.alphabets}
-            </>
-          )}</p>
-          <p>{output?.highest_alphabet && (
-            <>
-              Highest Alphabet: {output.highest_alphabet}
-            </>
-          )}</p>
-        </div>
+        {isSubmit && (
+          <>
+            <div className="relative mt-5 mb-5">
+              <label className="absolute top-[-10px] left-2 bg-white px-1 text-gray-700 text-sm">
+                Multi-select
+              </label>
+              <div className="border border-gray-300 rounded-lg p-2">
+                <Select
+                  closeMenuOnSelect={false}
+                  components={animatedComponents}
+                  isMulti
+                  options={options}
+                  onChange={(newValue) => setSelectedOptions(newValue as MultiValue<{ value: string, label: string }>)}
+                />
+              </div>
+            </div>
+
+            {(output?.error === undefined) ? (
+              <div>
+                <h1 className="font-bold">Filtered Response</h1>
+                {selectedOptions.some(option => option.value === 'num') && output.numbers.length > 0 && (
+                  <p>
+                    Numbers: {output.numbers.join(", ")}
+                  </p>
+                )}
+                {selectedOptions.some(option => option.value === 'alpha') && output.alphabets.length > 0 && (
+                  <p>
+                    Alphabets: {output.alphabets.join(", ")}
+                  </p>
+                )}
+                {selectedOptions.some(option => option.value === 'highalpha') && output.highest_alphabet.length > 0 && (
+                  <p>
+                    Highest Alphabet: {output.highest_alphabet.join(", ")}
+                  </p>
+                )}
+              </div>
+            ):(<div>{output.error}</div>)}
+          </>
+        )}
       </div>
     </div>
   );
